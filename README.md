@@ -6,6 +6,7 @@ As a lerning exercise to get to know zig I build a small command line tool that 
 see [src/USAGE.txt](https://github.com/SuSonicTH/zigcat/blob/master/src/USAGE.txt)
 
 ## Licence
+zigcat is licenced under the MIT licence
 see [src/LICENSE.txt](https://github.com/SuSonicTH/zigcat/blob/master/src/LICENSE.txt)
 
 ## Build requirements
