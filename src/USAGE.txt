@@ -1,0 +1,7 @@
+Usage: zigcat [OPTION]... [FILE]...
+Concatenate FILE(s) to standard output.
+With no FILE, or when FILE is -, read standard input.
+
+Options:
+        --help     display this help and exit
+        --version  display version/licence and exit
