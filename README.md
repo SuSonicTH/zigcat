@@ -7,10 +7,12 @@ see [src/USAGE.txt](https://github.com/SuSonicTH/zigcat/blob/master/src/USAGE.tx
 
 ## Licence
 zigcat is licenced under the MIT licence
+
 see [src/LICENSE.txt](https://github.com/SuSonicTH/zigcat/blob/master/src/LICENSE.txt)
 
 ## Build requirements
 To build zigcat you just need the zig compiler, which can be downloaded from [https://ziglang.org/download/](https://ziglang.org/download/)
+
 There is no installation needed, just download the package for your operating system an extract the archive and add it to your `PATH`
 
 ### Windows example
@@ -35,4 +37,5 @@ export PATH=$(pwd)/zig:$PATH
 
 ## Build
 If you have zig installed and on your `PATH` just cd into the directory and execute `zig build`
+
 The first build takes a while and when it's finished you'll find the executeable (zigcat or zigcat.exe) in zig-out/bin/
