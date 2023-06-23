@@ -1,15 +1,18 @@
 # zigcat
 
-As a lerning exercise to get to know zig I build a small commantline tool that works like cat
+As a lerning exercise to get to know zig I build a small command line tool that works like cat
 
 ## Usage
-see [src/USAGE.txt]: (https://github.com/SuSonicTH/zigcat/src/USAGE.txt)
+see [src/USAGE.txt](https://github.com/SuSonicTH/zigcat/blob/master/src/USAGE.txt)
 
 ## Licence
-see [src/LICENCE.txt]: (https://github.com/SuSonicTH/zigcat/src/LICENCE.txt)
+zigcat is licenced under the MIT licence
+
+see [src/LICENSE.txt](https://github.com/SuSonicTH/zigcat/blob/master/src/LICENSE.txt)
 
 ## Build requirements
-To build zigcat you just need the zig compiler, which can be downloaded from https://ziglang.org/download/
+To build zigcat you just need the zig compiler, which can be downloaded from [https://ziglang.org/download/](https://ziglang.org/download/)
+
 There is no installation needed, just download the package for your operating system an extract the archive and add it to your `PATH`
 
 ### Windows example
@@ -33,5 +36,6 @@ export PATH=$(pwd)/zig:$PATH
 ```
 
 ## Build
-if you have zig installed and on your `PATH` just cd into the directory and execute `zig build`
+If you have zig installed and on your `PATH` just cd into the directory and execute `zig build`
+
 The first build takes a while and when it's finished you'll find the executeable (zigcat or zigcat.exe) in zig-out/bin/
