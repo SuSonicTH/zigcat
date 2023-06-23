@@ -8,8 +8,8 @@ fn print_usage(file: std.fs.File) !void {
 }
 
 fn print_version(file: std.fs.File) !void {
-    const licence = @embedFile("LICENSE.txt");
-    try file.writeAll(version ++ licence);
+    const license = @embedFile("LICENSE.txt");
+    try file.writeAll(version ++ license);
 }
 
 pub fn main() !void {
