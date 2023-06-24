@@ -22,7 +22,7 @@ pub fn main() !void {
     const stdin = std.io.getStdIn();
 
     if (args.len == 1) {
-        try copy(stdin, stdout);
+        try copyFile(stdin);
     } else {
         for (args[1..]) |arg| {
             if (std.mem.eql(u8, arg, "--help")) {
@@ -35,9 +35,9 @@ pub fn main() !void {
                 try argument_error(gpa, arg);
                 std.os.exit(1);
             } else if (std.mem.eql(u8, arg, "-")) {
-                try copy(stdin, stdout);
+                try copyFile(stdin);
             } else {
-                try copy_file(arg, stdout);
+                try copyFileByName(arg);
             }
         }
     }
@@ -51,20 +51,21 @@ fn argument_error(allocator: std.mem.Allocator, arg: []u8) !void {
     try stderr.writeAll(message);
 }
 
-fn copy_file(name: []const u8, out: std.fs.File) !void {
+fn copyFileByName(name: []const u8) !void {
     var path_buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     const path = try std.fs.realpath(name, &path_buffer);
     const file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
 
-    try copy(file, out);
+    try copyFile(file);
 }
 
-fn copy(in: std.fs.File, out: std.fs.File) !void {
+fn copyFile(in: std.fs.File) !void {
+    const stdout = std.io.getStdOut();
     var buffer: [1024]u8 = undefined;
     var read = try in.readAll(&buffer);
     while (read > 0) {
-        try out.writeAll(buffer[0..read]);
+        try stdout.writeAll(buffer[0..read]);
         read = try in.readAll(&buffer);
     }
 }
