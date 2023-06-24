@@ -31,8 +31,8 @@ pub fn main() !void {
             } else if (std.mem.eql(u8, arg, "--version")) {
                 try print_version(stdout);
                 std.os.exit(0);
-            } else if (std.mem.eql(u8, arg[0..2], "--")) {
-                try argument_error(arg);
+            } else if (std.mem.eql(u8, arg[0..2], "--") or (std.mem.eql(u8, arg[0..1], "-") and arg.len != 1)) {
+                try argument_error(gpa, arg);
                 std.os.exit(1);
             } else if (std.mem.eql(u8, arg, "-")) {
                 try copy(stdin, stdout);
@@ -43,12 +43,12 @@ pub fn main() !void {
     }
 }
 
-fn argument_error(arg: []u8) !void {
+fn argument_error(allocator: std.mem.Allocator, arg: []u8) !void {
     const stderr = std.io.getStdErr();
     try print_usage(stderr);
-    try stderr.writeAll("Error: argument '");
-    try stderr.writeAll(arg);
-    try stderr.writeAll("' is unknown\n");
+    const message = std.fmt.allocPrint(allocator, "\nError: argument '{s}' is unknown\n", .{arg}) catch unreachable;
+    defer allocator.free(message);
+    try stderr.writeAll(message);
 }
 
 fn copy_file(name: []const u8, out: std.fs.File) !void {
