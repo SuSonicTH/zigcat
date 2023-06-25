@@ -14,6 +14,7 @@ fn print_version(file: std.fs.File) !void {
 
 const Options = struct {
     var outputNumbers: bool = false;
+    var outputNumbersNonEmpty: bool = false;
 };
 
 var line_number: u32 = 0;
@@ -46,10 +47,14 @@ pub fn main() !void {
                 std.os.exit(0);
             } else if (std.mem.eql(u8, arg, "--number")) {
                 Options.outputNumbers = true;
+            } else if (std.mem.eql(u8, arg, "--number-nonblank")) {
+                Options.outputNumbersNonEmpty = true;
             } else if (std.mem.eql(u8, arg[0..1], "-") and !std.mem.eql(u8, arg[1..1], "-")) {
                 for (arg[1..]) |opt| {
                     if (opt == 'n') {
                         Options.outputNumbers = true;
+                    } else if (opt == 'b') {
+                        Options.outputNumbersNonEmpty = true;
                     }
                 }
             } else if (std.mem.eql(u8, arg[0..2], "--") or (std.mem.eql(u8, arg[0..1], "-") and arg.len != 1)) {
@@ -81,7 +86,7 @@ fn processFileByName(name: []const u8) !void {
 }
 
 fn proccessFile(in: std.fs.File) !void {
-    if (Options.outputNumbers) {
+    if (Options.outputNumbers or Options.outputNumbersNonEmpty) {
         return processLines(in);
     }
     return copyFile(in);
@@ -102,7 +107,16 @@ fn processLines(in: std.fs.File) !void {
     var buffer: [1024]u8 = undefined;
 
     while (try reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
-        line_number += 1;
-        try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}\n", .{ line_number, line });
+        if (Options.outputNumbersNonEmpty) {
+            if (line.len > 0) {
+                line_number += 1;
+                try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}\n", .{ line_number, line });
+            } else {
+                try File.stdout.writeAll("\n");
+            }
+        } else if (Options.outputNumbers) {
+            line_number += 1;
+            try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}\n", .{ line_number, line });
+        }
     }
 }
