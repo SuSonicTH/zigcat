@@ -58,7 +58,7 @@ pub fn main() !void {
             } else if (std.mem.eql(u8, arg[0..2], "--")) {
                 try argument_error(gpa, arg);
                 std.os.exit(1);
-            } else if (std.mem.eql(u8, arg[0..1], "-")) {
+            } else if (arg[0] == '-' and arg.len > 1) {
                 for (arg[1..]) |opt| {
                     switch (opt) {
                         'n' => Options.outputNumbers = true,
@@ -74,7 +74,7 @@ pub fn main() !void {
                         },
                     }
                 }
-            } else if (std.mem.eql(u8, arg, "-")) {
+            } else if (arg[0] == '-') {
                 try proccessFile(File.stdin);
             } else {
                 try processFileByName(arg);
