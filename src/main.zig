@@ -97,7 +97,7 @@ fn processFileByName(name: []const u8) !void {
 }
 
 fn proccessFile(in: std.fs.File) !void {
-    if (Options.outputNumbers or Options.outputNumbersNonEmpty) {
+    if (Options.outputNumbers or Options.outputNumbersNonEmpty or Options.showEnds) {
         return processLines(in);
     }
     return copyFile(in);
@@ -126,6 +126,8 @@ fn processLines(in: std.fs.File) !void {
         } else if (Options.outputNumbers) {
             line_number += 1;
             try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}", .{ line_number, line });
+        } else {
+            try File.stdout.writeAll(line);
         }
 
         if (Options.showEnds) {
