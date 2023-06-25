@@ -60,20 +60,18 @@ pub fn main() !void {
                 std.os.exit(1);
             } else if (std.mem.eql(u8, arg[0..1], "-")) {
                 for (arg[1..]) |opt| {
-                    if (opt == 'n') {
-                        Options.outputNumbers = true;
-                    } else if (opt == 'b') {
-                        Options.outputNumbersNonEmpty = true;
-                    } else if (opt == 'E') {
-                        Options.showEnds = true;
-                    } else if (opt == 's') {
-                        Options.squeezeBlank = true;
-                    } else {
-                        var optArg: [2:0]u8 = undefined;
-                        optArg[0] = '-';
-                        optArg[1] = opt;
-                        try argument_error(gpa, &optArg);
-                        std.os.exit(1);
+                    switch (opt) {
+                        'n' => Options.outputNumbers = true,
+                        'b' => Options.outputNumbersNonEmpty = true,
+                        'E' => Options.showEnds = true,
+                        's' => Options.squeezeBlank = true,
+                        else => {
+                            var optArg: [2:0]u8 = undefined;
+                            optArg[0] = '-';
+                            optArg[1] = opt;
+                            try argument_error(gpa, &optArg);
+                            std.os.exit(1);
+                        },
                     }
                 }
             } else if (std.mem.eql(u8, arg, "-")) {
