@@ -17,6 +17,7 @@ const Options = struct {
     var outputNumbersNonEmpty: bool = false;
     var showEnds: bool = false;
     var squeezeBlank: bool = false;
+    var showTabs: bool = false;
 };
 
 var line_number: u32 = 0;
@@ -55,6 +56,8 @@ pub fn main() !void {
                 Options.outputNumbersNonEmpty = true;
             } else if (std.mem.eql(u8, arg, "--squeeze-blank")) {
                 Options.squeezeBlank = true;
+            } else if (std.mem.eql(u8, arg, "--show-tabs")) {
+                Options.showTabs = true;
             } else if (std.mem.eql(u8, arg[0..2], "--")) {
                 try argument_error(gpa, arg);
                 std.os.exit(1);
@@ -65,6 +68,7 @@ pub fn main() !void {
                         'b' => Options.outputNumbersNonEmpty = true,
                         'E' => Options.showEnds = true,
                         's' => Options.squeezeBlank = true,
+                        'T' => Options.showTabs = true,
                         else => {
                             var optArg = [_]u8{ '-', opt };
                             try argument_error(gpa, &optArg);
@@ -98,7 +102,7 @@ fn processFileByName(name: []const u8) !void {
 }
 
 fn proccessFile(in: std.fs.File) !void {
-    if (Options.outputNumbers or Options.outputNumbersNonEmpty or Options.showEnds or Options.squeezeBlank) {
+    if (Options.outputNumbers or Options.outputNumbersNonEmpty or Options.showEnds or Options.squeezeBlank or Options.showTabs) {
         return processLines(in);
     }
     return copyFile(in);
@@ -134,11 +138,23 @@ fn processLines(in: std.fs.File) !void {
         if (Options.outputNumbersNonEmpty) {
             if (line.len > 0) {
                 line_number += 1;
-                try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}", .{ line_number, line });
+                try std.fmt.format(File.stdout.writer(), "{d: >6}\t", .{line_number});
             }
         } else if (Options.outputNumbers) {
             line_number += 1;
-            try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}", .{ line_number, line });
+            try std.fmt.format(File.stdout.writer(), "{d: >6}\t", .{line_number});
+        }
+
+        if (Options.showTabs) {
+            var add_tab: bool = false;
+            var iter = std.mem.splitSequence(u8, line, "\t");
+            while (iter.next()) |part| {
+                if (add_tab) {
+                    try File.stdout.writeAll("^I");
+                }
+                try File.stdout.writeAll(part);
+                add_tab = true;
+            }
         } else {
             try File.stdout.writeAll(line);
         }
