@@ -49,17 +49,23 @@ pub fn main() !void {
                 Options.outputNumbers = true;
             } else if (std.mem.eql(u8, arg, "--number-nonblank")) {
                 Options.outputNumbersNonEmpty = true;
-            } else if (std.mem.eql(u8, arg[0..1], "-") and !std.mem.eql(u8, arg[1..1], "-")) {
+            } else if (std.mem.eql(u8, arg[0..2], "--")) {
+                try argument_error(gpa, arg);
+                std.os.exit(1);
+            } else if (std.mem.eql(u8, arg[0..1], "-")) {
                 for (arg[1..]) |opt| {
                     if (opt == 'n') {
                         Options.outputNumbers = true;
                     } else if (opt == 'b') {
                         Options.outputNumbersNonEmpty = true;
+                    } else {
+                        var optArg: [2:0]u8 = undefined;
+                        optArg[0] = '-';
+                        optArg[1] = opt;
+                        try argument_error(gpa, &optArg);
+                        std.os.exit(1);
                     }
                 }
-            } else if (std.mem.eql(u8, arg[0..2], "--") or (std.mem.eql(u8, arg[0..1], "-") and arg.len != 1)) {
-                try argument_error(gpa, arg);
-                std.os.exit(1);
             } else if (std.mem.eql(u8, arg, "-")) {
                 try proccessFile(File.stdin);
             } else {
