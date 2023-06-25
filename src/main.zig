@@ -15,6 +15,7 @@ fn print_version(file: std.fs.File) !void {
 const Options = struct {
     var outputNumbers: bool = false;
     var outputNumbersNonEmpty: bool = false;
+    var showEnds: bool = false;
 };
 
 var line_number: u32 = 0;
@@ -49,6 +50,8 @@ pub fn main() !void {
                 Options.outputNumbers = true;
             } else if (std.mem.eql(u8, arg, "--number-nonblank")) {
                 Options.outputNumbersNonEmpty = true;
+            } else if (std.mem.eql(u8, arg, "--show-ends")) {
+                Options.outputNumbersNonEmpty = true;
             } else if (std.mem.eql(u8, arg[0..2], "--")) {
                 try argument_error(gpa, arg);
                 std.os.exit(1);
@@ -58,6 +61,8 @@ pub fn main() !void {
                         Options.outputNumbers = true;
                     } else if (opt == 'b') {
                         Options.outputNumbersNonEmpty = true;
+                    } else if (opt == 'E') {
+                        Options.showEnds = true;
                     } else {
                         var optArg: [2:0]u8 = undefined;
                         optArg[0] = '-';
@@ -116,13 +121,16 @@ fn processLines(in: std.fs.File) !void {
         if (Options.outputNumbersNonEmpty) {
             if (line.len > 0) {
                 line_number += 1;
-                try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}\n", .{ line_number, line });
-            } else {
-                try File.stdout.writeAll("\n");
+                try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}", .{ line_number, line });
             }
         } else if (Options.outputNumbers) {
             line_number += 1;
-            try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}\n", .{ line_number, line });
+            try std.fmt.format(File.stdout.writer(), "{d: >6}\t{s}", .{ line_number, line });
         }
+
+        if (Options.showEnds) {
+            try File.stdout.writeAll("$");
+        }
+        try File.stdout.writeAll("\n");
     }
 }
