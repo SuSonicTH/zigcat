@@ -66,9 +66,7 @@ pub fn main() !void {
                         'E' => Options.showEnds = true,
                         's' => Options.squeezeBlank = true,
                         else => {
-                            var optArg: [2:0]u8 = undefined;
-                            optArg[0] = '-';
-                            optArg[1] = opt;
+                            var optArg = [_]u8{ '-', opt };
                             try argument_error(gpa, &optArg);
                             std.os.exit(1);
                         },
