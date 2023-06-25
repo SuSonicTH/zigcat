@@ -16,6 +16,7 @@ const Options = struct {
     var outputNumbers: bool = false;
     var outputNumbersNonEmpty: bool = false;
     var showEnds: bool = false;
+    var squeezeBlank: bool = false;
 };
 
 var line_number: u32 = 0;
@@ -52,6 +53,8 @@ pub fn main() !void {
                 Options.outputNumbersNonEmpty = true;
             } else if (std.mem.eql(u8, arg, "--show-ends")) {
                 Options.outputNumbersNonEmpty = true;
+            } else if (std.mem.eql(u8, arg, "--squeeze-blank")) {
+                Options.squeezeBlank = true;
             } else if (std.mem.eql(u8, arg[0..2], "--")) {
                 try argument_error(gpa, arg);
                 std.os.exit(1);
@@ -63,6 +66,8 @@ pub fn main() !void {
                         Options.outputNumbersNonEmpty = true;
                     } else if (opt == 'E') {
                         Options.showEnds = true;
+                    } else if (opt == 's') {
+                        Options.squeezeBlank = true;
                     } else {
                         var optArg: [2:0]u8 = undefined;
                         optArg[0] = '-';
@@ -97,7 +102,7 @@ fn processFileByName(name: []const u8) !void {
 }
 
 fn proccessFile(in: std.fs.File) !void {
-    if (Options.outputNumbers or Options.outputNumbersNonEmpty or Options.showEnds) {
+    if (Options.outputNumbers or Options.outputNumbersNonEmpty or Options.showEnds or Options.squeezeBlank) {
         return processLines(in);
     }
     return copyFile(in);
@@ -116,8 +121,20 @@ fn processLines(in: std.fs.File) !void {
     var buffered_Reader = std.io.bufferedReader(in.reader());
     var reader = buffered_Reader.reader();
     var buffer: [1024]u8 = undefined;
+    var last_was_blank: bool = false;
 
     while (try reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
+        if (Options.squeezeBlank) {
+            if (line.len == 0) {
+                if (last_was_blank) {
+                    continue;
+                }
+                last_was_blank = true;
+            } else {
+                last_was_blank = false;
+            }
+        }
+
         if (Options.outputNumbersNonEmpty) {
             if (line.len > 0) {
                 line_number += 1;
