@@ -96,7 +96,7 @@ fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options:
     return copyFile(reader, writer);
 }
 
-fn copyFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !void {
+fn copyFile(reader: anytype, writer: anytype) !void {
     var buffer: [1024]u8 = undefined;
     var read = try reader.readAll(&buffer);
     while (read > 0) {
@@ -107,7 +107,7 @@ fn copyFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !void {
 
 var line_number: u32 = 0;
 
-fn processLines(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options: Options) !void {
+fn processLines(reader: anytype, writer: anytype, options: Options) !void {
     var buffered_reader = std.io.bufferedReader(reader);
     var buffer: [1024]u8 = undefined;
     var last_was_blank: bool = false;
@@ -153,4 +153,69 @@ fn processLines(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options:
         }
         try writer.writeAll("\n");
     }
+}
+
+test "copyFile unmodifyed" {
+    const input = @embedFile("tests/input.txt");
+    var input_stream = std.io.fixedBufferStream(input);
+    const reader = input_stream.reader();
+
+    var buffer: [512]u8 = undefined;
+    var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
+    var writer = source.writer();
+
+    try copyFile(reader, writer);
+
+    try std.testing.expectEqualStrings(input, source.buffer.getWritten());
+}
+
+test "processLines unmodifyed" {
+    const input = @embedFile("tests/input.txt");
+    var input_stream = std.io.fixedBufferStream(input);
+    const reader = input_stream.reader();
+
+    var buffer: [512]u8 = undefined;
+    var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
+    var writer = source.writer();
+
+    var options = Options{};
+    try processLines(reader, writer, options);
+
+    try std.testing.expectEqualStrings(input, source.buffer.getWritten());
+}
+
+test "processLines --number" {
+    const input = @embedFile("tests/input.txt");
+    const expected_output = @embedFile("tests/expected_number.txt");
+
+    var input_stream = std.io.fixedBufferStream(input);
+    const reader = input_stream.reader();
+
+    var buffer: [512]u8 = undefined;
+    var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
+    var writer = source.writer();
+
+    var options = Options{ .outputNumbers = true };
+    line_number = 0;
+    try processLines(reader, writer, options);
+
+    try std.testing.expectEqualStrings(expected_output, source.buffer.getWritten());
+}
+
+test "processLines --number-nonblank" {
+    const input = @embedFile("tests/input.txt");
+    const expected_output = @embedFile("tests/expected_number-nonblank.txt");
+
+    var input_stream = std.io.fixedBufferStream(input);
+    const reader = input_stream.reader();
+
+    var buffer: [512]u8 = undefined;
+    var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
+    var writer = source.writer();
+
+    var options = Options{ .outputNumbersNonEmpty = true };
+    line_number = 0;
+    try processLines(reader, writer, options);
+
+    try std.testing.expectEqualStrings(expected_output, source.buffer.getWritten());
 }
