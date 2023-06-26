@@ -1,7 +1,13 @@
 Usage: zigcat [OPTION]... [FILE]...
 Concatenate FILE(s) to standard output.
+
 With no FILE, or when FILE is -, read standard input.
 
 Options:
-        --help     display this help and exit
-        --version  display version/licence and exit
+        -n, --number            number all output lines
+        -b, --number-nonblank   number nonempty output lines, overrides -n
+        -E, --show-ends         display $ at end of each line
+        -s, --squeeze-blank     suppress repeated empty output lines
+        -T, --show-tabs         display TAB characters as ^I
+            --help              display this help and exit
+            --version           display version/licence and exit
