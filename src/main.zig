@@ -169,8 +169,7 @@ test "copyFile unmodifyed" {
     try std.testing.expectEqualStrings(input, source.buffer.getWritten());
 }
 
-test "processLines unmodifyed" {
-    const input = @embedFile("tests/input.txt");
+fn test_processing(input: []const u8, options: Options, expected_output: []const u8) !void {
     var input_stream = std.io.fixedBufferStream(input);
     const reader = input_stream.reader();
 
@@ -178,44 +177,69 @@ test "processLines unmodifyed" {
     var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
     var writer = source.writer();
 
-    var options = Options{};
+    line_number = 0;
     try processLines(reader, writer, options);
-
-    try std.testing.expectEqualStrings(input, source.buffer.getWritten());
+    try std.testing.expectEqualStrings(expected_output, source.buffer.getWritten());
 }
 
-test "processLines --number" {
+test "zigcat" {
+    const input = @embedFile("tests/input.txt");
+
+    try test_processing(input, .{}, input);
+}
+
+test "zigcat --number" {
     const input = @embedFile("tests/input.txt");
     const expected_output = @embedFile("tests/expected_number.txt");
 
-    var input_stream = std.io.fixedBufferStream(input);
-    const reader = input_stream.reader();
-
-    var buffer: [512]u8 = undefined;
-    var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
-    var writer = source.writer();
-
-    var options = Options{ .outputNumbers = true };
-    line_number = 0;
-    try processLines(reader, writer, options);
-
-    try std.testing.expectEqualStrings(expected_output, source.buffer.getWritten());
+    try test_processing(input, .{ .outputNumbers = true }, expected_output);
 }
 
-test "processLines --number-nonblank" {
+test "zigcat --number-nonblank" {
     const input = @embedFile("tests/input.txt");
     const expected_output = @embedFile("tests/expected_number-nonblank.txt");
 
-    var input_stream = std.io.fixedBufferStream(input);
-    const reader = input_stream.reader();
+    try test_processing(input, .{ .outputNumbersNonEmpty = true }, expected_output);
+}
 
-    var buffer: [512]u8 = undefined;
-    var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
-    var writer = source.writer();
+test "zigcat --number --number-nonblank" {
+    const input = @embedFile("tests/input.txt");
+    const expected_output = @embedFile("tests/expected_number-nonblank.txt");
 
-    var options = Options{ .outputNumbersNonEmpty = true };
-    line_number = 0;
-    try processLines(reader, writer, options);
+    try test_processing(input, .{ .outputNumbers = true, .outputNumbersNonEmpty = true }, expected_output);
+}
 
-    try std.testing.expectEqualStrings(expected_output, source.buffer.getWritten());
+test "zigcat --show-ends" {
+    const input = @embedFile("tests/input.txt");
+    const expected_output = @embedFile("tests/expected_show-ends.txt");
+
+    try test_processing(input, .{ .showEnds = true }, expected_output);
+}
+
+test "zigcat --squeeze-blank" {
+    const input = @embedFile("tests/input.txt");
+    const expected_output = @embedFile("tests/expected_squeeze-blank.txt");
+
+    try test_processing(input, .{ .squeezeBlank = true }, expected_output);
+}
+
+test "zigcat --show-tabs" {
+    const input = @embedFile("tests/input.txt");
+    const expected_output = @embedFile("tests/expected_show-tabs.txt");
+
+    try test_processing(input, .{ .showTabs = true }, expected_output);
+}
+
+test "zigcat --number-nonblank --show-ends --squeeze-blank --show-tabs" {
+    const input = @embedFile("tests/input.txt");
+    const expected_output = @embedFile("tests/expected_number-nonblank_show-ends_squeeze-blank_show-tabs.txt");
+
+    const options = Options{
+        .outputNumbersNonEmpty = true,
+        .showEnds = true,
+        .squeezeBlank = true,
+        .showTabs = true,
+    };
+
+    try test_processing(input, options, expected_output);
 }

@@ -1,0 +1,12 @@
+Line Without Tab
+
+Line^IWith^ITabs
+
+
+^IStarts with tab
+Ends with tab^I
+
+
+
+Line Without Tab
+

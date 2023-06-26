@@ -1,0 +1,9 @@
+     1	Line Without Tab$
+$
+     2	Line^IWith^ITabs$
+$
+     3	^IStarts with tab$
+     4	Ends with tab^I$
+$
+     5	Line Without Tab$
+$
