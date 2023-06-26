@@ -1,6 +1,16 @@
 # zigcat
 
-As a lerning exercise to get to know zig I build a small command line tool that works like cat
+As a lerning exercise to get to know zig I build a small command line tool that works like cat.
+Most GNU cat commandline options are implemented.
+
+### Missing options (all depend on --show-nonprinting)
+* -A, --show-all
+* -e
+* -t
+* -v, --show-nonprinting
+
+Feedback from more experienced zig developers is verry welcome.
+If you find any bug or you see some non-idiomatic costructs please let me know.
 
 ## Usage
 see [src/USAGE.txt](https://github.com/SuSonicTH/zigcat/blob/master/src/USAGE.txt)
@@ -39,3 +49,8 @@ export PATH=$(pwd)/zig:$PATH
 If you have zig installed and on your `PATH` just cd into the directory and execute `zig build`
 
 The first build takes a while and when it's finished you'll find the executeable (zigcat or zigcat.exe) in zig-out/bin/
+
+You can run the built-in uinit tests with `zig build test` If everything is ok you will see no output.
+
+Or you can run `zig test src/main.zig` that should give you the output "All 9 tests passed." if everything is OK.
+
