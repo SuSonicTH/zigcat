@@ -1,0 +1,12 @@
+     1	Line Without Tab
+     2	
+     3	Line	With	Tabs
+     4	
+     5	
+     6		Starts with tab
+     7	Ends with tab	
+     8	
+     9	
+    10	
+    11	Line Without Tab
+    12	
