@@ -20,34 +20,23 @@ const Options = struct {
     showTabs: bool = false,
 };
 
-var line_number: u32 = 0;
-
-const File = struct {
-    var stdout: std.fs.File = undefined;
-    var stdin: std.fs.File = undefined;
-    var stderr: std.fs.File = undefined;
-};
-
 pub fn main() !void {
     var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
     const gpa = general_purpose_allocator.allocator();
     const args = try std.process.argsAlloc(gpa);
     defer std.process.argsFree(gpa, args);
 
-    File.stdout = std.io.getStdOut();
-    File.stdin = std.io.getStdIn();
-    File.stderr = std.io.getStdErr();
     var options = Options{};
 
     if (args.len == 1) {
-        try proccessFile(File.stdin, options);
+        try proccessFile(std.io.getStdIn().reader(), std.io.getStdOut().writer(), options);
     } else {
         for (args[1..]) |arg| {
             if (std.mem.eql(u8, arg, "--help")) {
-                try print_usage(File.stdout);
+                try print_usage(std.io.getStdOut());
                 std.os.exit(0);
             } else if (std.mem.eql(u8, arg, "--version")) {
-                try print_version(File.stdout);
+                try print_version(std.io.getStdOut());
                 std.os.exit(0);
             } else if (std.mem.eql(u8, arg, "--number")) {
                 options.outputNumbers = true;
@@ -78,7 +67,7 @@ pub fn main() !void {
                     }
                 }
             } else if (arg[0] == '-') {
-                try proccessFile(File.stdin, options);
+                try proccessFile(std.io.getStdIn().reader(), std.io.getStdOut().writer(), options);
             } else {
                 try processFileByName(arg, options);
             }
@@ -87,10 +76,8 @@ pub fn main() !void {
 }
 
 fn argument_error(allocator: std.mem.Allocator, arg: []u8) !void {
-    try print_usage(File.stderr);
     const message = std.fmt.allocPrint(allocator, "\nError: argument '{s}' is unknown\n", .{arg}) catch unreachable;
     defer allocator.free(message);
-    try File.stderr.writeAll(message);
 }
 
 fn processFileByName(name: []const u8, options: Options) !void {
@@ -99,32 +86,33 @@ fn processFileByName(name: []const u8, options: Options) !void {
     const file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
 
-    try proccessFile(file, options);
+    try proccessFile(file.reader(), std.io.getStdOut().writer(), options);
 }
 
-fn proccessFile(in: std.fs.File, options: Options) !void {
+fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options: Options) !void {
     if (options.outputNumbers or options.outputNumbersNonEmpty or options.showEnds or options.squeezeBlank or options.showTabs) {
-        return processLines(in, options);
+        return processLines(reader, writer, options);
     }
-    return copyFile(in);
+    return copyFile(reader, writer);
 }
 
-fn copyFile(in: std.fs.File) !void {
+fn copyFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer) !void {
     var buffer: [1024]u8 = undefined;
-    var read = try in.readAll(&buffer);
+    var read = try reader.readAll(&buffer);
     while (read > 0) {
-        try File.stdout.writeAll(buffer[0..read]);
-        read = try in.readAll(&buffer);
+        try writer.writeAll(buffer[0..read]);
+        read = try reader.readAll(&buffer);
     }
 }
 
-fn processLines(in: std.fs.File, options: Options) !void {
-    var buffered_Reader = std.io.bufferedReader(in.reader());
-    var reader = buffered_Reader.reader();
+var line_number: u32 = 0;
+
+fn processLines(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options: Options) !void {
+    var buffered_reader = std.io.bufferedReader(reader);
     var buffer: [1024]u8 = undefined;
     var last_was_blank: bool = false;
 
-    while (try reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
+    while (try buffered_reader.reader().readUntilDelimiterOrEof(&buffer, '\n')) |line| {
         if (options.squeezeBlank) {
             if (line.len == 0) {
                 if (last_was_blank) {
@@ -139,11 +127,11 @@ fn processLines(in: std.fs.File, options: Options) !void {
         if (options.outputNumbersNonEmpty) {
             if (line.len > 0) {
                 line_number += 1;
-                try std.fmt.format(File.stdout.writer(), "{d: >6}\t", .{line_number});
+                try std.fmt.format(writer, "{d: >6}\t", .{line_number});
             }
         } else if (options.outputNumbers) {
             line_number += 1;
-            try std.fmt.format(File.stdout.writer(), "{d: >6}\t", .{line_number});
+            try std.fmt.format(writer, "{d: >6}\t", .{line_number});
         }
 
         if (options.showTabs) {
@@ -151,18 +139,18 @@ fn processLines(in: std.fs.File, options: Options) !void {
             var iter = std.mem.splitSequence(u8, line, "\t");
             while (iter.next()) |part| {
                 if (add_tab) {
-                    try File.stdout.writeAll("^I");
+                    try writer.writeAll("^I");
                 }
-                try File.stdout.writeAll(part);
+                try writer.writeAll(part);
                 add_tab = true;
             }
         } else {
-            try File.stdout.writeAll(line);
+            try writer.writeAll(line);
         }
 
         if (options.showEnds) {
-            try File.stdout.writeAll("$");
+            try writer.writeAll("$");
         }
-        try File.stdout.writeAll("\n");
+        try writer.writeAll("\n");
     }
 }
