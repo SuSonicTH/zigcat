@@ -13,11 +13,11 @@ fn print_version(file: std.fs.File) !void {
 }
 
 const Options = struct {
-    var outputNumbers: bool = false;
-    var outputNumbersNonEmpty: bool = false;
-    var showEnds: bool = false;
-    var squeezeBlank: bool = false;
-    var showTabs: bool = false;
+    outputNumbers: bool = false,
+    outputNumbersNonEmpty: bool = false,
+    showEnds: bool = false,
+    squeezeBlank: bool = false,
+    showTabs: bool = false,
 };
 
 var line_number: u32 = 0;
@@ -37,9 +37,10 @@ pub fn main() !void {
     File.stdout = std.io.getStdOut();
     File.stdin = std.io.getStdIn();
     File.stderr = std.io.getStdErr();
+    var options = Options{};
 
     if (args.len == 1) {
-        try proccessFile(File.stdin);
+        try proccessFile(File.stdin, options);
     } else {
         for (args[1..]) |arg| {
             if (std.mem.eql(u8, arg, "--help")) {
@@ -49,26 +50,26 @@ pub fn main() !void {
                 try print_version(File.stdout);
                 std.os.exit(0);
             } else if (std.mem.eql(u8, arg, "--number")) {
-                Options.outputNumbers = true;
+                options.outputNumbers = true;
             } else if (std.mem.eql(u8, arg, "--number-nonblank")) {
-                Options.outputNumbersNonEmpty = true;
+                options.outputNumbersNonEmpty = true;
             } else if (std.mem.eql(u8, arg, "--show-ends")) {
-                Options.outputNumbersNonEmpty = true;
+                options.outputNumbersNonEmpty = true;
             } else if (std.mem.eql(u8, arg, "--squeeze-blank")) {
-                Options.squeezeBlank = true;
+                options.squeezeBlank = true;
             } else if (std.mem.eql(u8, arg, "--show-tabs")) {
-                Options.showTabs = true;
+                options.showTabs = true;
             } else if (std.mem.eql(u8, arg[0..2], "--")) {
                 try argument_error(gpa, arg);
                 std.os.exit(1);
             } else if (arg[0] == '-' and arg.len > 1) {
                 for (arg[1..]) |opt| {
                     switch (opt) {
-                        'n' => Options.outputNumbers = true,
-                        'b' => Options.outputNumbersNonEmpty = true,
-                        'E' => Options.showEnds = true,
-                        's' => Options.squeezeBlank = true,
-                        'T' => Options.showTabs = true,
+                        'n' => options.outputNumbers = true,
+                        'b' => options.outputNumbersNonEmpty = true,
+                        'E' => options.showEnds = true,
+                        's' => options.squeezeBlank = true,
+                        'T' => options.showTabs = true,
                         else => {
                             var optArg = [_]u8{ '-', opt };
                             try argument_error(gpa, &optArg);
@@ -77,9 +78,9 @@ pub fn main() !void {
                     }
                 }
             } else if (arg[0] == '-') {
-                try proccessFile(File.stdin);
+                try proccessFile(File.stdin, options);
             } else {
-                try processFileByName(arg);
+                try processFileByName(arg, options);
             }
         }
     }
@@ -92,18 +93,18 @@ fn argument_error(allocator: std.mem.Allocator, arg: []u8) !void {
     try File.stderr.writeAll(message);
 }
 
-fn processFileByName(name: []const u8) !void {
+fn processFileByName(name: []const u8, options: Options) !void {
     var path_buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     const path = try std.fs.realpath(name, &path_buffer);
     const file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
 
-    try proccessFile(file);
+    try proccessFile(file, options);
 }
 
-fn proccessFile(in: std.fs.File) !void {
-    if (Options.outputNumbers or Options.outputNumbersNonEmpty or Options.showEnds or Options.squeezeBlank or Options.showTabs) {
-        return processLines(in);
+fn proccessFile(in: std.fs.File, options: Options) !void {
+    if (options.outputNumbers or options.outputNumbersNonEmpty or options.showEnds or options.squeezeBlank or options.showTabs) {
+        return processLines(in, options);
     }
     return copyFile(in);
 }
@@ -117,14 +118,14 @@ fn copyFile(in: std.fs.File) !void {
     }
 }
 
-fn processLines(in: std.fs.File) !void {
+fn processLines(in: std.fs.File, options: Options) !void {
     var buffered_Reader = std.io.bufferedReader(in.reader());
     var reader = buffered_Reader.reader();
     var buffer: [1024]u8 = undefined;
     var last_was_blank: bool = false;
 
     while (try reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
-        if (Options.squeezeBlank) {
+        if (options.squeezeBlank) {
             if (line.len == 0) {
                 if (last_was_blank) {
                     continue;
@@ -135,17 +136,17 @@ fn processLines(in: std.fs.File) !void {
             }
         }
 
-        if (Options.outputNumbersNonEmpty) {
+        if (options.outputNumbersNonEmpty) {
             if (line.len > 0) {
                 line_number += 1;
                 try std.fmt.format(File.stdout.writer(), "{d: >6}\t", .{line_number});
             }
-        } else if (Options.outputNumbers) {
+        } else if (options.outputNumbers) {
             line_number += 1;
             try std.fmt.format(File.stdout.writer(), "{d: >6}\t", .{line_number});
         }
 
-        if (Options.showTabs) {
+        if (options.showTabs) {
             var add_tab: bool = false;
             var iter = std.mem.splitSequence(u8, line, "\t");
             while (iter.next()) |part| {
@@ -159,7 +160,7 @@ fn processLines(in: std.fs.File) !void {
             try File.stdout.writeAll(line);
         }
 
-        if (Options.showEnds) {
+        if (options.showEnds) {
             try File.stdout.writeAll("$");
         }
         try File.stdout.writeAll("\n");
