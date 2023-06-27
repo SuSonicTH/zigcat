@@ -16,7 +16,7 @@ fn printVersion(file: std.fs.File) !void {
     std.os.exit(0);
 }
 
-const Options = struct {
+const Options = packed struct {
     outputNumbers: bool = false,
     outputNumbersNonEmpty: bool = false,
     showEnds: bool = false,
@@ -97,7 +97,7 @@ fn processFileByName(name: []const u8, options: Options) !void {
 }
 
 fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options: Options) !void {
-    if (options.outputNumbers or options.outputNumbersNonEmpty or options.showEnds or options.squeezeBlank or options.showTabs) {
+    if (@bitCast(u5, options) > 0) {
         return processLines(reader, writer, options);
     }
     return copyFile(reader, writer);
@@ -156,6 +156,13 @@ fn processLines(reader: anytype, writer: anytype, options: Options) !void {
         }
         try writer.writeAll("\n");
     }
+}
+
+test "options check" {
+    var opts = Options{};
+    try std.testing.expect(@bitCast(u5, opts) == 0);
+    opts.showTabs = true;
+    try std.testing.expect(@bitCast(u5, opts) != 0);
 }
 
 test "copyFile" {
