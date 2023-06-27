@@ -2,14 +2,18 @@ const std = @import("std");
 
 const version = "zigcat v0.1\n\n";
 
-fn printUsage(file: std.fs.File) !void {
+fn printUsage(file: std.fs.File, exit: bool) !void {
     const help = @embedFile("USAGE.txt");
     try file.writeAll(version ++ help);
+    if (exit) {
+        std.os.exit(0);
+    }
 }
 
 fn printVersion(file: std.fs.File) !void {
     const license = @embedFile("LICENSE.txt");
     try file.writeAll(version ++ license);
+    std.os.exit(0);
 }
 
 const Options = struct {
@@ -18,6 +22,16 @@ const Options = struct {
     showEnds: bool = false,
     squeezeBlank: bool = false,
     showTabs: bool = false,
+};
+
+const Arguments = enum {
+    help,
+    version,
+    number,
+    @"number-nonblank",
+    @"show-ends",
+    @"squeeze-blank",
+    @"show-tabs",
 };
 
 pub fn main() !void {
@@ -32,25 +46,18 @@ pub fn main() !void {
         try proccessFile(std.io.getStdIn().reader(), std.io.getStdOut().writer(), options);
     } else {
         for (args[1..]) |arg| {
-            if (std.mem.eql(u8, arg, "--help")) {
-                try printUsage(std.io.getStdOut());
-                std.os.exit(0);
-            } else if (std.mem.eql(u8, arg, "--version")) {
-                try printVersion(std.io.getStdOut());
-                std.os.exit(0);
-            } else if (std.mem.eql(u8, arg, "--number")) {
-                options.outputNumbers = true;
-            } else if (std.mem.eql(u8, arg, "--number-nonblank")) {
-                options.outputNumbersNonEmpty = true;
-            } else if (std.mem.eql(u8, arg, "--show-ends")) {
-                options.outputNumbersNonEmpty = true;
-            } else if (std.mem.eql(u8, arg, "--squeeze-blank")) {
-                options.squeezeBlank = true;
-            } else if (std.mem.eql(u8, arg, "--show-tabs")) {
-                options.showTabs = true;
-            } else if (std.mem.eql(u8, arg[0..2], "--")) {
-                try argumentError(arg);
-                std.os.exit(1);
+            if (std.mem.startsWith(u8, arg, "--")) {
+                switch (std.meta.stringToEnum(Arguments, arg[2..]) orelse {
+                    try argumentError(arg);
+                }) {
+                    .help => try printUsage(std.io.getStdOut(), true),
+                    .version => try printVersion(std.io.getStdOut()),
+                    .number => options.outputNumbers = true,
+                    .@"number-nonblank" => options.outputNumbersNonEmpty = true,
+                    .@"show-ends" => options.showEnds = true,
+                    .@"squeeze-blank" => options.squeezeBlank = true,
+                    .@"show-tabs" => options.showTabs = true,
+                }
             } else if (arg[0] == '-' and arg.len > 1) {
                 for (arg[1..]) |opt| {
                     switch (opt) {
@@ -62,7 +69,6 @@ pub fn main() !void {
                         else => {
                             var optArg = [_]u8{ '-', opt };
                             try argumentError(&optArg);
-                            std.os.exit(1);
                         },
                     }
                 }
@@ -75,9 +81,10 @@ pub fn main() !void {
     }
 }
 
-fn argumentError(arg: []u8) !void {
-    try printUsage(std.io.getStdErr());
+fn argumentError(arg: []u8) !noreturn {
+    try printUsage(std.io.getStdErr(), false);
     std.log.err("argument '{s}' is unknown\n", .{arg});
+    std.os.exit(1);
 }
 
 fn processFileByName(name: []const u8, options: Options) !void {
@@ -90,22 +97,18 @@ fn processFileByName(name: []const u8, options: Options) !void {
 }
 
 fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options: Options) !void {
-    if (options.outputNumbers or options.outputNumbersNonEmpty or options.showEnds or options.squeezeBlank or options.showTabs) {
-        return processLines(reader, writer, options);
+    for (std.meta.tags(options)) |option| {
+        if (option) {
+            return processLines(reader, writer, options);
+        }
     }
+    //    if (options.outputNumbers or options.outputNumbersNonEmpty or options.showEnds or options.squeezeBlank or options.showTabs) {
     return copyFile(reader, writer);
 }
 
 fn copyFile(reader: anytype, writer: anytype) !void {
     var fifo = std.fifo.LinearFifo(u8, .{ .Static = std.mem.page_size }).init();
     try fifo.pump(reader, writer);
-
-    //    var buffer: [1024]u8 = undefined;
-    //    var read = try reader.readAll(&buffer);
-    //    while (read > 0) {
-    //        try writer.writeAll(buffer[0..read]);
-    //        read = try reader.readAll(&buffer);
-    //    }
 }
 
 var line_number: u32 = 0;
