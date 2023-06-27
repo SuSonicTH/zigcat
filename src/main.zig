@@ -2,12 +2,12 @@ const std = @import("std");
 
 const version = "zigcat v0.1\n\n";
 
-fn print_usage(file: std.fs.File) !void {
+fn printUsage(file: std.fs.File) !void {
     const help = @embedFile("USAGE.txt");
     try file.writeAll(version ++ help);
 }
 
-fn print_version(file: std.fs.File) !void {
+fn printVersion(file: std.fs.File) !void {
     const license = @embedFile("LICENSE.txt");
     try file.writeAll(version ++ license);
 }
@@ -33,10 +33,10 @@ pub fn main() !void {
     } else {
         for (args[1..]) |arg| {
             if (std.mem.eql(u8, arg, "--help")) {
-                try print_usage(std.io.getStdOut());
+                try printUsage(std.io.getStdOut());
                 std.os.exit(0);
             } else if (std.mem.eql(u8, arg, "--version")) {
-                try print_version(std.io.getStdOut());
+                try printVersion(std.io.getStdOut());
                 std.os.exit(0);
             } else if (std.mem.eql(u8, arg, "--number")) {
                 options.outputNumbers = true;
@@ -49,7 +49,7 @@ pub fn main() !void {
             } else if (std.mem.eql(u8, arg, "--show-tabs")) {
                 options.showTabs = true;
             } else if (std.mem.eql(u8, arg[0..2], "--")) {
-                try argument_error(gpa, arg);
+                try argumentError(arg);
                 std.os.exit(1);
             } else if (arg[0] == '-' and arg.len > 1) {
                 for (arg[1..]) |opt| {
@@ -61,7 +61,7 @@ pub fn main() !void {
                         'T' => options.showTabs = true,
                         else => {
                             var optArg = [_]u8{ '-', opt };
-                            try argument_error(gpa, &optArg);
+                            try argumentError(&optArg);
                             std.os.exit(1);
                         },
                     }
@@ -75,9 +75,9 @@ pub fn main() !void {
     }
 }
 
-fn argument_error(allocator: std.mem.Allocator, arg: []u8) !void {
-    const message = std.fmt.allocPrint(allocator, "\nError: argument '{s}' is unknown\n", .{arg}) catch unreachable;
-    defer allocator.free(message);
+fn argumentError(arg: []u8) !void {
+    try printUsage(std.io.getStdErr());
+    std.log.err("argument '{s}' is unknown\n", .{arg});
 }
 
 fn processFileByName(name: []const u8, options: Options) !void {
@@ -97,12 +97,15 @@ fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options:
 }
 
 fn copyFile(reader: anytype, writer: anytype) !void {
-    var buffer: [1024]u8 = undefined;
-    var read = try reader.readAll(&buffer);
-    while (read > 0) {
-        try writer.writeAll(buffer[0..read]);
-        read = try reader.readAll(&buffer);
-    }
+    var fifo = std.fifo.LinearFifo(u8, .{ .Static = std.mem.page_size }).init();
+    try fifo.pump(reader, writer);
+
+    //    var buffer: [1024]u8 = undefined;
+    //    var read = try reader.readAll(&buffer);
+    //    while (read > 0) {
+    //        try writer.writeAll(buffer[0..read]);
+    //        read = try reader.readAll(&buffer);
+    //    }
 }
 
 var line_number: u32 = 0;
