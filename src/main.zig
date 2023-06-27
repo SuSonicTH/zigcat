@@ -97,12 +97,9 @@ fn processFileByName(name: []const u8, options: Options) !void {
 }
 
 fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options: Options) !void {
-    for (std.meta.tags(options)) |option| {
-        if (option) {
-            return processLines(reader, writer, options);
-        }
+    if (options.outputNumbers or options.outputNumbersNonEmpty or options.showEnds or options.squeezeBlank or options.showTabs) {
+        return processLines(reader, writer, options);
     }
-    //    if (options.outputNumbers or options.outputNumbersNonEmpty or options.showEnds or options.squeezeBlank or options.showTabs) {
     return copyFile(reader, writer);
 }
 
@@ -161,7 +158,7 @@ fn processLines(reader: anytype, writer: anytype, options: Options) !void {
     }
 }
 
-test "copyFile unmodifyed" {
+test "copyFile" {
     const input = @embedFile("tests/input.txt");
     var input_stream = std.io.fixedBufferStream(input);
     const reader = input_stream.reader();
