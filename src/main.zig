@@ -97,7 +97,7 @@ fn processFileByName(name: []const u8, options: Options) !void {
 }
 
 fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options: Options) !void {
-    if (@bitCast(u5, options) > 0) {
+    if (@as(u5, @bitCast(options)) > 0) {
         return processLines(reader, writer, options);
     }
     return copyFile(reader, writer);
@@ -160,9 +160,9 @@ fn processLines(reader: anytype, writer: anytype, options: Options) !void {
 
 test "options check" {
     var opts = Options{};
-    try std.testing.expect(@bitCast(u5, opts) == 0);
+    try std.testing.expect(@as(u5, @bitCast(opts)) == 0);
     opts.showTabs = true;
-    try std.testing.expect(@bitCast(u5, opts) != 0);
+    try std.testing.expect(@as(u5, @bitCast(opts)) != 0);
 }
 
 test "copyFile" {
