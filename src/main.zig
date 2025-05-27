@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const version = "zigcat v0.1\n\n";
 
@@ -6,14 +7,14 @@ fn printUsage(file: std.fs.File, exit: bool) !void {
     const help = @embedFile("USAGE.txt");
     try file.writeAll(version ++ help);
     if (exit) {
-        std.os.exit(0);
+        std.process.exit(0);
     }
 }
 
 fn printVersion(file: std.fs.File) !void {
     const license = @embedFile("LICENSE.txt");
     try file.writeAll(version ++ license);
-    std.os.exit(0);
+    std.process.exit(0);
 }
 
 const Options = packed struct {
@@ -25,20 +26,35 @@ const Options = packed struct {
 };
 
 const Arguments = enum {
-    help,
-    version,
-    number,
-    @"number-nonblank",
-    @"show-ends",
-    @"squeeze-blank",
-    @"show-tabs",
+    @"--help",
+    @"--version",
+    @"--number",
+    @"-n",
+    @"--number-nonblank",
+    @"-b",
+    @"--show-ends",
+    @"-E",
+    @"--squeeze-blank",
+    @"-s",
+    @"--show-tabs",
+    @"-T",
+    @"-",
 };
 
 pub fn main() !void {
-    var general_purpose_allocator = std.heap.GeneralPurposeAllocator(.{}){};
-    const gpa = general_purpose_allocator.allocator();
-    const args = try std.process.argsAlloc(gpa);
-    defer std.process.argsFree(gpa, args);
+    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
+    const allocator, const is_debug = gpa: {
+        break :gpa switch (builtin.mode) {
+            .Debug, .ReleaseSafe => .{ debug_allocator.allocator(), true },
+            .ReleaseFast, .ReleaseSmall => .{ std.heap.smp_allocator, false },
+        };
+    };
+    defer if (is_debug) {
+        _ = debug_allocator.deinit();
+    };
+
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
 
     var options = Options{};
 
@@ -46,34 +62,19 @@ pub fn main() !void {
         try proccessFile(std.io.getStdIn().reader(), std.io.getStdOut().writer(), options);
     } else {
         for (args[1..]) |arg| {
-            if (std.mem.startsWith(u8, arg, "--")) {
-                switch (std.meta.stringToEnum(Arguments, arg[2..]) orelse {
+            if (arg[0] == '-') {
+                switch (std.meta.stringToEnum(Arguments, arg) orelse {
                     try argumentError(arg);
                 }) {
-                    .help => try printUsage(std.io.getStdOut(), true),
-                    .version => try printVersion(std.io.getStdOut()),
-                    .number => options.outputNumbers = true,
-                    .@"number-nonblank" => options.outputNumbersNonEmpty = true,
-                    .@"show-ends" => options.showEnds = true,
-                    .@"squeeze-blank" => options.squeezeBlank = true,
-                    .@"show-tabs" => options.showTabs = true,
+                    .@"--help" => try printUsage(std.io.getStdOut(), true),
+                    .@"--version" => try printVersion(std.io.getStdOut()),
+                    .@"--number", .@"-n" => options.outputNumbers = true,
+                    .@"--number-nonblank", .@"-b" => options.outputNumbersNonEmpty = true,
+                    .@"--show-ends", .@"-E" => options.showEnds = true,
+                    .@"--squeeze-blank", .@"-s" => options.squeezeBlank = true,
+                    .@"--show-tabs", .@"-T" => options.showTabs = true,
+                    .@"-" => try proccessFile(std.io.getStdIn().reader(), std.io.getStdOut().writer(), options),
                 }
-            } else if (arg[0] == '-' and arg.len > 1) {
-                for (arg[1..]) |opt| {
-                    switch (opt) {
-                        'n' => options.outputNumbers = true,
-                        'b' => options.outputNumbersNonEmpty = true,
-                        'E' => options.showEnds = true,
-                        's' => options.squeezeBlank = true,
-                        'T' => options.showTabs = true,
-                        else => {
-                            var optArg = [_]u8{ '-', opt };
-                            try argumentError(&optArg);
-                        },
-                    }
-                }
-            } else if (arg[0] == '-') {
-                try proccessFile(std.io.getStdIn().reader(), std.io.getStdOut().writer(), options);
             } else {
                 try processFileByName(arg, options);
             }
@@ -84,11 +85,11 @@ pub fn main() !void {
 fn argumentError(arg: []u8) !noreturn {
     try printUsage(std.io.getStdErr(), false);
     std.log.err("argument '{s}' is unknown\n", .{arg});
-    std.os.exit(1);
+    std.process.exit(1);
 }
 
 fn processFileByName(name: []const u8, options: Options) !void {
-    var path_buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+    var path_buffer: [std.fs.max_path_bytes]u8 = undefined;
     const path = try std.fs.realpath(name, &path_buffer);
     const file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
@@ -104,7 +105,7 @@ fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options:
 }
 
 fn copyFile(reader: anytype, writer: anytype) !void {
-    var fifo = std.fifo.LinearFifo(u8, .{ .Static = std.mem.page_size }).init();
+    var fifo = std.fifo.LinearFifo(u8, .{ .Static = std.heap.page_size_max }).init();
     try fifo.pump(reader, writer);
 }
 
@@ -172,7 +173,7 @@ test "copyFile" {
 
     var buffer: [512]u8 = undefined;
     var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
-    var writer = source.writer();
+    const writer = source.writer();
 
     try copyFile(reader, writer);
 
@@ -185,7 +186,7 @@ fn test_processing(input: []const u8, options: Options, expected_output: []const
 
     var buffer: [512]u8 = undefined;
     var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
-    var writer = source.writer();
+    const writer = source.writer();
 
     line_number = 0;
     try processLines(reader, writer, options);
