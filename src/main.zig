@@ -3,17 +3,19 @@ const builtin = @import("builtin");
 
 const version = "zigcat v0.1\n\n";
 
-fn printUsage(file: std.fs.File, exit: bool) !void {
+fn printUsage(writer: *std.Io.Writer, exit: bool) !void {
     const help = @embedFile("USAGE.txt");
-    try file.writeAll(version ++ help);
+    try writer.writeAll(version ++ help);
+    try writer.flush();
     if (exit) {
         std.process.exit(0);
     }
 }
 
-fn printVersion(file: std.fs.File) !void {
+fn printVersion(writer: *std.Io.Writer) !void {
     const license = @embedFile("LICENSE.txt");
-    try file.writeAll(version ++ license);
+    try writer.writeAll(version ++ license);
+    try writer.flush();
     std.process.exit(0);
 }
 
@@ -58,65 +60,82 @@ pub fn main() !void {
 
     var options = Options{};
 
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    var stdin_buffer: [4096]u8 = undefined;
+    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    const stdin = &stdin_reader.interface;
+
     if (args.len == 1) {
-        try proccessFile(std.io.getStdIn().reader(), std.io.getStdOut().writer(), options);
+        try proccessFile(stdin, stdout, options);
     } else {
         for (args[1..]) |arg| {
             if (arg[0] == '-') {
                 switch (std.meta.stringToEnum(Arguments, arg) orelse {
                     try argumentError(arg);
                 }) {
-                    .@"--help" => try printUsage(std.io.getStdOut(), true),
-                    .@"--version" => try printVersion(std.io.getStdOut()),
+                    .@"--help" => try printUsage(stdout, true),
+                    .@"--version" => try printVersion(stdout),
                     .@"--number", .@"-n" => options.outputNumbers = true,
                     .@"--number-nonblank", .@"-b" => options.outputNumbersNonEmpty = true,
                     .@"--show-ends", .@"-E" => options.showEnds = true,
                     .@"--squeeze-blank", .@"-s" => options.squeezeBlank = true,
                     .@"--show-tabs", .@"-T" => options.showTabs = true,
-                    .@"-" => try proccessFile(std.io.getStdIn().reader(), std.io.getStdOut().writer(), options),
+                    .@"-" => try proccessFile(stdin, stdout, options),
                 }
             } else {
-                try processFileByName(arg, options);
+                try processFileByName(arg, stdout, options);
             }
         }
     }
 }
 
 fn argumentError(arg: []u8) !noreturn {
-    try printUsage(std.io.getStdErr(), false);
-    std.log.err("argument '{s}' is unknown\n", .{arg});
+    var stderr_buffer: [4096]u8 = undefined;
+    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    const stderr = &stderr_writer.interface;
+
+    try printUsage(stderr, false);
+    try stderr.print("argument '{s}' is unknown\n", .{arg});
+    try stderr.flush();
     std.process.exit(1);
 }
 
-fn processFileByName(name: []const u8, options: Options) !void {
+fn processFileByName(name: []const u8, writer: *std.Io.Writer, options: Options) !void {
     var path_buffer: [std.fs.max_path_bytes]u8 = undefined;
     const path = try std.fs.realpath(name, &path_buffer);
     const file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
-
-    try proccessFile(file.reader(), std.io.getStdOut().writer(), options);
+    var buffer: [4096]u8 = undefined;
+    var reader = file.reader(&buffer);
+    try proccessFile(&reader.interface, writer, options);
 }
 
-fn proccessFile(reader: std.fs.File.Reader, writer: std.fs.File.Writer, options: Options) !void {
+fn proccessFile(reader: *std.Io.Reader, writer: *std.Io.Writer, options: Options) !void {
     if (@as(u5, @bitCast(options)) > 0) {
         return processLines(reader, writer, options);
     }
     return copyFile(reader, writer);
 }
 
-fn copyFile(reader: anytype, writer: anytype) !void {
-    var fifo = std.fifo.LinearFifo(u8, .{ .Static = std.heap.page_size_max }).init();
-    try fifo.pump(reader, writer);
+fn copyFile(reader: *std.Io.Reader, writer: *std.Io.Writer) !void {
+    _ = try reader.streamRemaining(writer);
+    try writer.flush();
 }
 
 var line_number: u32 = 0;
 
-fn processLines(reader: anytype, writer: anytype, options: Options) !void {
-    var buffered_reader = std.io.bufferedReader(reader);
-    var buffer: [1024]u8 = undefined;
+fn processLines(reader: *std.Io.Reader, writer: *std.Io.Writer, options: Options) !void {
     var last_was_blank: bool = false;
 
-    while (try buffered_reader.reader().readUntilDelimiterOrEof(&buffer, '\n')) |line| {
+    while (true) {
+        const line = reader.takeDelimiterExclusive('\n') catch |err| switch (err) {
+            error.EndOfStream => return,
+            else => return err,
+        };
+
         if (options.squeezeBlank) {
             if (line.len == 0) {
                 if (last_was_blank) {
@@ -131,11 +150,11 @@ fn processLines(reader: anytype, writer: anytype, options: Options) !void {
         if (options.outputNumbersNonEmpty) {
             if (line.len > 0) {
                 line_number += 1;
-                try std.fmt.format(writer, "{d: >6}\t", .{line_number});
+                try writer.print("{d: >6}\t", .{line_number});
             }
         } else if (options.outputNumbers) {
             line_number += 1;
-            try std.fmt.format(writer, "{d: >6}\t", .{line_number});
+            try writer.print("{d: >6}\t", .{line_number});
         }
 
         if (options.showTabs) {
@@ -168,29 +187,25 @@ test "options check" {
 
 test "copyFile" {
     const input = @embedFile("tests/input.txt");
-    var input_stream = std.io.fixedBufferStream(input);
-    const reader = input_stream.reader();
+    var reader = std.Io.Reader.fixed(input);
 
     var buffer: [512]u8 = undefined;
-    var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
-    const writer = source.writer();
+    var writer = std.Io.Writer.fixed(&buffer);
 
-    try copyFile(reader, writer);
+    try copyFile(&reader, &writer);
 
-    try std.testing.expectEqualStrings(input, source.buffer.getWritten());
+    try std.testing.expectEqualStrings(input, buffer[0..writer.end]);
 }
 
 fn test_processing(input: []const u8, options: Options, expected_output: []const u8) !void {
-    var input_stream = std.io.fixedBufferStream(input);
-    const reader = input_stream.reader();
+    var reader = std.Io.Reader.fixed(input);
 
     var buffer: [512]u8 = undefined;
-    var source = std.io.StreamSource{ .buffer = std.io.fixedBufferStream(&buffer) };
-    const writer = source.writer();
+    var writer = std.Io.Writer.fixed(&buffer);
 
     line_number = 0;
-    try processLines(reader, writer, options);
-    try std.testing.expectEqualStrings(expected_output, source.buffer.getWritten());
+    try processLines(&reader, &writer, options);
+    try std.testing.expectEqualStrings(expected_output, buffer[0..writer.end]);
 }
 
 test "zigcat" {
