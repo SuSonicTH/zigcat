@@ -22,7 +22,7 @@ see [LICENSE.txt](https://github.com/SuSonicTH/zigcat/blob/master/LICENSE.txt)
 
 ## Build requirements
 To build zigcat you just need the zig compiler, which can be downloaded from [https://ziglang.org/download/](https://ziglang.org/download/)
-Currently this builds with zig 0.15.1, I will update the project for future versions.
+Currently this builds with zig 0.16.0, I will update the project for future versions.
 There is no installation needed, just download the package for your operating system an extract the archive and add it to your `PATH`
 
 ## Build

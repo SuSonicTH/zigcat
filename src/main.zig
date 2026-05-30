@@ -43,29 +43,23 @@ const Arguments = enum {
     @"-",
 };
 
-pub fn main() !void {
-    var debug_allocator: std.heap.DebugAllocator(.{}) = .init;
-    const allocator, const is_debug = gpa: {
-        break :gpa switch (builtin.mode) {
-            .Debug, .ReleaseSafe => .{ debug_allocator.allocator(), true },
-            .ReleaseFast, .ReleaseSmall => .{ std.heap.smp_allocator, false },
-        };
-    };
-    defer if (is_debug) {
-        _ = debug_allocator.deinit();
-    };
+var init: std.process.Init = undefined;
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+pub fn main(ini: std.process.Init) !void {
+    init = ini;
+    const allocator = init.arena.allocator();
+
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
+    defer allocator.free(args);
 
     var options = Options{};
 
     var stdout_buffer: [4096]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(init.io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
     var stdin_buffer: [4096]u8 = undefined;
-    var stdin_reader = std.fs.File.stdin().reader(&stdin_buffer);
+    var stdin_reader = std.Io.File.stdin().reader(init.io, &stdin_buffer);
     const stdin = &stdin_reader.interface;
 
     if (args.len == 1) {
@@ -92,9 +86,9 @@ pub fn main() !void {
     }
 }
 
-fn argumentError(arg: []u8) !noreturn {
+fn argumentError(arg: [:0]const u8) !noreturn {
     var stderr_buffer: [4096]u8 = undefined;
-    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writer(init.io, &stderr_buffer);
     const stderr = &stderr_writer.interface;
 
     try printUsage(stderr, false);
@@ -104,12 +98,11 @@ fn argumentError(arg: []u8) !noreturn {
 }
 
 fn processFileByName(name: []const u8, writer: *std.Io.Writer, options: Options) !void {
-    var path_buffer: [std.fs.max_path_bytes]u8 = undefined;
-    const path = try std.fs.realpath(name, &path_buffer);
-    const file = try std.fs.openFileAbsolute(path, .{});
-    defer file.close();
+    const file = try std.Io.Dir.cwd().openFile(init.io, name, .{});
+    defer file.close(init.io);
+
     var buffer: [4096]u8 = undefined;
-    var reader = file.reader(&buffer);
+    var reader = file.reader(init.io, &buffer);
     try proccessFile(&reader.interface, writer, options);
 }
 
@@ -135,6 +128,7 @@ fn processLines(reader: *std.Io.Reader, writer: *std.Io.Writer, options: Options
             error.EndOfStream => return,
             else => return err,
         };
+        reader.toss(1);
 
         if (options.squeezeBlank) {
             if (line.len == 0) {
