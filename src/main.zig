@@ -1,7 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const version = "zigcat v0.1\n\n";
+const version = "zigcat v0.2\n\n";
 
 fn printUsage(writer: *std.Io.Writer, exit: bool) !void {
     const help = @embedFile("USAGE.txt");
@@ -43,16 +43,8 @@ const Arguments = enum {
     @"-",
 };
 
-var init: std.process.Init = undefined;
-
-pub fn main(ini: std.process.Init) !void {
-    init = ini;
-    const allocator = init.arena.allocator();
-
+pub fn main(init: std.process.Init) !void {
     const args = try init.minimal.args.toSlice(init.arena.allocator());
-    defer allocator.free(args);
-
-    var options = Options{};
 
     var stdout_buffer: [4096]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writer(init.io, &stdout_buffer);
@@ -62,13 +54,14 @@ pub fn main(ini: std.process.Init) !void {
     var stdin_reader = std.Io.File.stdin().reader(init.io, &stdin_buffer);
     const stdin = &stdin_reader.interface;
 
+    var options = Options{};
     if (args.len == 1) {
         try proccessFile(stdin, stdout, options);
     } else {
         for (args[1..]) |arg| {
             if (arg[0] == '-') {
                 switch (std.meta.stringToEnum(Arguments, arg) orelse {
-                    try argumentError(arg);
+                    try argumentError(init.io, arg);
                 }) {
                     .@"--help" => try printUsage(stdout, true),
                     .@"--version" => try printVersion(stdout),
@@ -80,15 +73,15 @@ pub fn main(ini: std.process.Init) !void {
                     .@"-" => try proccessFile(stdin, stdout, options),
                 }
             } else {
-                try processFileByName(arg, stdout, options);
+                try processFileByName(init.io, arg, stdout, options);
             }
         }
     }
 }
 
-fn argumentError(arg: [:0]const u8) !noreturn {
+fn argumentError(io: std.Io, arg: [:0]const u8) !noreturn {
     var stderr_buffer: [4096]u8 = undefined;
-    var stderr_writer = std.Io.File.stderr().writer(init.io, &stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
     const stderr = &stderr_writer.interface;
 
     try printUsage(stderr, false);
@@ -97,20 +90,20 @@ fn argumentError(arg: [:0]const u8) !noreturn {
     std.process.exit(1);
 }
 
-fn processFileByName(name: []const u8, writer: *std.Io.Writer, options: Options) !void {
-    const file = try std.Io.Dir.cwd().openFile(init.io, name, .{});
-    defer file.close(init.io);
+fn processFileByName(io: std.Io, name: []const u8, writer: *std.Io.Writer, options: Options) !void {
+    const file = try std.Io.Dir.cwd().openFile(io, name, .{});
+    defer file.close(io);
 
     var buffer: [4096]u8 = undefined;
-    var reader = file.reader(init.io, &buffer);
+    var reader = file.reader(io, &buffer);
     try proccessFile(&reader.interface, writer, options);
 }
 
 fn proccessFile(reader: *std.Io.Reader, writer: *std.Io.Writer, options: Options) !void {
-    if (@as(u5, @bitCast(options)) > 0) {
-        return processLines(reader, writer, options);
+    if (@as(u5, @bitCast(options)) == 0) {
+        return copyFile(reader, writer);
     }
-    return copyFile(reader, writer);
+    return processLines(reader, writer, options);
 }
 
 fn copyFile(reader: *std.Io.Reader, writer: *std.Io.Writer) !void {
