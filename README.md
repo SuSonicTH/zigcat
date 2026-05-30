@@ -30,7 +30,7 @@ If you have zig installed and on your `PATH` just cd into the directory and exec
 
 The first build takes a while and when it's finished you'll find the executeable (zigcat or zigcat.exe) in zig-out/bin/
 
-You can run the built-in uinit tests with `zig build test` If everything is ok you will see no output.
+You can run the built-in unit tests with `zig build test` If everything is ok you will see no output.
 
 Or you can run `zig test src/main.zig` that should give you the output "All 10 tests passed." if everything is OK.
 
