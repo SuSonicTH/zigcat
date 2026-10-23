@@ -22,7 +22,7 @@ see [LICENSE.txt](https://github.com/SuSonicTH/zigcat/blob/master/LICENSE.txt)
 
 ## Build requirements
 To build zigcat you just need the zig compiler, which can be downloaded from [https://ziglang.org/download/](https://ziglang.org/download/)
-Currently this builds with zig 0.16.0, I will update the project for future versions.
+Currently this builds with zig 0.17.0, I will update the project for future versions.
 There is no installation needed, just download the package for your operating system an extract the archive and add it to your `PATH`
 
 ## Build
@@ -32,6 +32,6 @@ The first build takes a while and when it's finished you'll find the executeable
 
 You can run the built-in unit tests with `zig build test` If everything is ok you will see no output.
 
-Or you can run `zig test src/main.zig` that should give you the output "All 10 tests passed." if everything is OK.
+Or you can run `zig test src/main.zig` that should give you the output "All 11 tests passed." if everything is OK.
 
 To create an optimized release build run `zig build -Doptimize=ReleaseFast`

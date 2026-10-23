@@ -55,28 +55,43 @@ pub fn main(init: std.process.Init) !void {
     const stdin = &stdin_reader.interface;
 
     var options = Options{};
-    if (args.len == 1) {
-        try proccessFile(stdin, stdout, options);
-    } else {
-        for (args[1..]) |arg| {
-            if (arg[0] == '-') {
-                switch (std.meta.stringToEnum(Arguments, arg) orelse {
-                    try argumentError(init.io, arg);
-                }) {
-                    .@"--help" => try printUsage(stdout, true),
-                    .@"--version" => try printVersion(stdout),
-                    .@"--number", .@"-n" => options.outputNumbers = true,
-                    .@"--number-nonblank", .@"-b" => options.outputNumbersNonEmpty = true,
-                    .@"--show-ends", .@"-E" => options.showEnds = true,
-                    .@"--squeeze-blank", .@"-s" => options.squeezeBlank = true,
-                    .@"--show-tabs", .@"-T" => options.showTabs = true,
-                    .@"-" => try proccessFile(stdin, stdout, options),
-                }
-            } else {
-                try processFileByName(init.io, arg, stdout, options);
-            }
+
+    // Parse all options before processing any operand so that a flag applies to
+    // every file, no matter where it appears on the command line.
+    for (args[1..]) |arg| {
+        if (arg.len == 0 or arg[0] != '-') continue;
+
+        switch (std.meta.stringToEnum(Arguments, arg) orelse {
+            try argumentError(init.io, arg);
+        }) {
+            .@"--help" => try printUsage(stdout, true),
+            .@"--version" => try printVersion(stdout),
+            .@"--number", .@"-n" => options.outputNumbers = true,
+            .@"--number-nonblank", .@"-b" => options.outputNumbersNonEmpty = true,
+            .@"--show-ends", .@"-E" => options.showEnds = true,
+            .@"--squeeze-blank", .@"-s" => options.squeezeBlank = true,
+            .@"--show-tabs", .@"-T" => options.showTabs = true,
+            .@"-" => {},
         }
     }
+
+    var operand_seen = false;
+    for (args[1..]) |arg| {
+        if (std.mem.eql(u8, arg, "-")) {
+            try proccessFile(stdin, stdout, options);
+            operand_seen = true;
+        } else if (arg.len == 0 or arg[0] != '-') {
+            try processFileByName(init.io, arg, stdout, options);
+            operand_seen = true;
+        }
+    }
+
+    // Like cat, read standard input when no file operand is given.
+    if (!operand_seen) {
+        try proccessFile(stdin, stdout, options);
+    }
+
+    try stdout.flush();
 }
 
 fn argumentError(io: std.Io, arg: [:0]const u8) !noreturn {
@@ -121,7 +136,16 @@ fn processLines(reader: *std.Io.Reader, writer: *std.Io.Writer, options: Options
             error.EndOfStream => return,
             else => return err,
         };
-        reader.toss(1);
+
+        // End of stream also terminates a line, but has no delimiter to consume.
+        const next_byte: ?u8 = reader.peekByte() catch |err| switch (err) {
+            error.EndOfStream => null,
+            else => return err,
+        };
+        const has_newline = if (next_byte) |byte| byte == '\n' else false;
+        if (has_newline) {
+            reader.toss(1);
+        }
 
         if (options.squeezeBlank) {
             if (line.len == 0) {
@@ -158,10 +182,12 @@ fn processLines(reader: *std.Io.Reader, writer: *std.Io.Writer, options: Options
             try writer.writeAll(line);
         }
 
-        if (options.showEnds) {
+        if (options.showEnds and has_newline) {
             try writer.writeAll("$");
         }
-        try writer.writeAll("\n");
+        if (has_newline) {
+            try writer.writeAll("\n");
+        }
     }
 }
 
@@ -193,6 +219,11 @@ fn test_processing(input: []const u8, options: Options, expected_output: []const
     line_number = 0;
     try processLines(&reader, &writer, options);
     try std.testing.expectEqualStrings(expected_output, buffer[0..writer.end]);
+}
+
+test "zigcat last line without trailing newline" {
+    try test_processing("no trailing newline", .{ .outputNumbers = true }, "     1\tno trailing newline");
+    try test_processing("no trailing newline", .{ .showEnds = true }, "no trailing newline");
 }
 
 test "zigcat" {

@@ -13,7 +13,13 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    if (optimize != .Debug) {
+    // src/main.zig embeds LICENSE.txt with @embedFile, but the file lives in the
+    // project root. Expose it as an anonymous import so the module can see it.
+    exe.root_module.addAnonymousImport("LICENSE.txt", .{
+        .root_source_file = b.path("LICENSE.txt"),
+    });
+
+    if (optimize != .debug) {
         exe.root_module.strip = true;
     }
 
@@ -23,9 +29,7 @@ pub fn build(b: *std.Build) void {
 
     run_cmd.step.dependOn(b.getInstallStep());
 
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
@@ -36,6 +40,10 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         }),
+    });
+
+    unit_tests.root_module.addAnonymousImport("LICENSE.txt", .{
+        .root_source_file = b.path("LICENSE.txt"),
     });
 
     const run_unit_tests = b.addRunArtifact(unit_tests);
